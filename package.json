@@ -1,0 +1,55 @@
+{
+	"name": "@yodasws/webtoolkit",
+	"version": "0.4.4",
+	"description": "Sam Grundman's Super Awesome Gulp Web Development Toolkit",
+	"main": "gulpfile.js",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/YodasWs/webtoolkit.git"
+	},
+	"author": "Samuel B Grundman (https://github.com/YodasWs/)",
+	"bugs": {
+		"url": "https://github.com/YodasWs/webtoolkit/issues"
+	},
+	"homepage": "https://github.com/YodasWs/webtoolkit#readme",
+	"scripts": {
+		"build": "gulp compile",
+		"dev": "gulp",
+		"lint": "gulp lint",
+		"start": "gulp serve",
+		"test": "gulp test:js"
+	},
+	"devDependencies": {
+		"@babel/core": "^7.20.2",
+		"@babel/preset-env": "^7.20.2",
+		"@yodasws/gulp-pattern-replace": "^1.1.1",
+		"babel-loader": "^9.1.0",
+		"file-exists": "^4.0.0",
+		"font-awesome": "^4.7.0",
+		"gulp": "^5.0.0",
+		"gulp-autoprefixer": "^7.0.0",
+		"gulp-babel": "^8.0.0",
+		"gulp-concat": "^2.6.1",
+		"gulp-connect": "^5.7.0",
+		"gulp-eslint-new": "^2.4.0",
+		"gulp-file": "^0.4.0",
+		"gulp-htmlmin": "^5.0.1",
+		"gulp-load-plugins": "^2.0.1",
+		"gulp-order": "^1.2.0",
+		"gulp-rm-lines": "<1.0.0",
+		"gulp-run-command": "<1.0.0",
+		"gulp-sass": "^6.0.0",
+		"gulp-sass-lint": "^1.4.0",
+		"gulp-ssi": "^0.1.3",
+		"gulp-strip-css-comments": "^2.0.0",
+		"sass": "^1.85.1",
+		"vinyl-named": "^1.1.0",
+		"webpack": "^5.84.1",
+		"webpack-stream": "^7.0.0",
+		"yargs": "^18.0.0"
+	},
+	"directories": {
+		"lib": "lib"
+	},
+	"packageManager": "yarn@4.9.1"
+}
