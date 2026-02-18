@@ -4,7 +4,6 @@
 	"description": "Sam Grundman's essays on America",
 	"main": "gulpfile.js",
 	"private": true,
-	"type": "module",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/YodasWs/Project-Blue-Horizon.git"
