@@ -1,0 +1,31 @@
+article[itemscope][itemtype~="http://schema.org/Article"] {
+	hgroup > p {
+		font-weight: bold;
+		margin-left: 2rem;
+	}
+
+	time[itemprop="datePublished"] {
+		font-size: 0.8em;
+		font-style: italic;
+		color: grey;
+		margin-left: 2rem;
+
+		@supports (color: light-dark(grey, lightgrey)) {
+			color: light-dark(grey, lightgrey);
+		}
+
+		@media (prefers-color-scheme: dark) {
+			color: lightgrey;
+		}
+	}
+
+	div[itemprop="articleBody"] {
+		display: contents;
+	}
+
+	figure[itemprop="video"] {
+		> video {
+			width: 100%;
+		}
+	}
+}
