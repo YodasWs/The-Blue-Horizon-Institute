@@ -1,10 +1,11 @@
-$header-color: black;
-$header-bg: lightgreen;
+$light-theme: ( 'background': #00AEF3, 'color': black );
+$dark-theme: ( 'background': #4B4EEE, 'color': #1A1A1A );
+
 $header-second-color: black;
 
 body > header {
-	color: $header-color;
-	background: $header-bg;
+	color: map.get($light-theme, 'color');
+	background: map.get($light-theme, 'background');
 
 	h1 {
 		margin: 0;
@@ -24,5 +25,19 @@ body > nav:not([hidden]) {
 
 	> *:not([hidden]) {
 		display: block;
+	}
+}
+
+@supports (background: light-dark(#457B9D, #E1F53A)) {
+	body > header {
+		background: light-dark(map.get($light-theme, 'background'), map.get($dark-theme, 'background'));
+		color: light-dark(map.get($light-theme, 'color'), map.get($dark-theme, 'color'));
+	}
+}
+
+@media (prefers-color-scheme: dark) {
+	body > header {
+		background: map.get($dark-theme, 'background');
+		color: map.get($dark-theme, 'color');
 	}
 }

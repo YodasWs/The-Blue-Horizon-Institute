@@ -1,3 +1,8 @@
+@use 'sass:map';
+
+$light-theme: ( 'html': whitesmoke, 'background': #F1F1F2, 'color': #293241, 'link': #4B4EEE );
+$dark-theme: ( 'html': black, 'background': #1A1A1A, 'color': #FDFDFD, 'link': #4B4EEE );
+
 * { box-sizing: border-box; }
 
 :root { font-family: 'Trebuchet MS', 'Open Sans', 'Helvetica Neue', sans-serif; }
@@ -5,7 +10,7 @@
 html {
 	height: 100%;
 	width: 100%;
-	background: whitesmoke;
+	background: map.get($light-theme, 'html');
 }
 
 body {
@@ -15,7 +20,7 @@ body {
 	width: 100%;
 	max-width: 1200px;
 	min-height: 100%;
-	background: white;
+	background: map.get($light-theme, 'background');
 	border: 0 none;
 
 	@media (min-width: 1201px) {
@@ -61,7 +66,11 @@ h6 {
 
 a:link,
 a:visited {
-	color: dodgerblue;
+	color: map.get($light-theme, 'link');
+}
+
+details > summary {
+	cursor: pointer;
 }
 
 #y-spinner {
@@ -103,5 +112,37 @@ a:visited {
 
 	~ nav[y-component="topNav"] {
 		display: none;
+	}
+}
+
+@supports (background: light-dark(#F1F1F2, #1A1A1A)) {
+	html {
+		background: light-dark(whitesmoke, map.get($dark-theme, 'html'));
+	}
+
+	body {
+		background: light-dark(map.get($light-theme, 'background'), map.get($dark-theme, 'background'));
+		color: light-dark(map.get($light-theme, 'color'), map.get($dark-theme, 'color'));
+	}
+
+	a:link,
+	a:visited {
+		color: light-dark(map.get($light-theme, 'link'), map.get($dark-theme, 'link'));
+	}
+}
+
+@media (prefers-color-scheme: dark) {
+	html {
+		background: map.get($dark-theme, 'html');
+	}
+
+	body {
+		background: map.get($dark-theme, 'background');
+		color: map.get($dark-theme, 'color');
+	}
+
+	a:link,
+	a:visited {
+		color: map.get($dark-theme, 'link');
 	}
 }
