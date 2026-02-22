@@ -21,6 +21,11 @@ article[itemscope][itemtype~="http://schema.org/Article"] {
 
 	div[itemprop="articleBody"] {
 		display: contents;
+
+		h3,
+		p {
+			margin: 1rem 0;
+		}
 	}
 
 	figure[itemprop="video"] {
