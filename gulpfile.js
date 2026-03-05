@@ -92,7 +92,7 @@ const plugins = require('gulp-load-plugins')({
 		'gulp-autoprefixer': 'prefixCSS',
 		'gulp-run-command': 'cli',
 		'gulp-eslint-new': 'lintES',
-		'gulp-htmlmin': 'compileHTML',
+		'gulp-htmlmin': 'minimizeHtml',
 		'gulp-babel': 'compileJS',
 		'gulp-order': 'sort',
 		'gulp-file': 'newFile',
@@ -149,7 +149,7 @@ const options = {
 	stripCssComments: {
 		preserve: false,
 	},
-	compileHTML: {
+	minimizeHtml: {
 		collapseWhitespace: true,
 		decodeEntities: true,
 		keepClosingSlash: false,
@@ -391,18 +391,6 @@ function runTasks(task) {
 		fileType: 'js',
 	},
 	{
-		name: 'compile:html',
-		src: [
-			'./src/**/*.html',
-			'!**/includes/**/*.html',
-		],
-		tasks: [
-			'ssi',
-			'compileHTML',
-		],
-		fileType: 'html',
-	},
-	{
 		name: 'transfer:assets',
 		src: [
 			'./src/**/*.jp{,e}g',
@@ -416,6 +404,61 @@ function runTasks(task) {
 		return runTasks(task);
 	});
 });
+
+// Wrap the home page, essays, and miscellaneous pages in the site template and move to the docs folder
+function compilePages() {
+	return gulp.src([
+		'./src/**/*.html',
+		'!./src/*/index.html',
+		'!./src/*/**/index.html',
+		'!./src/pages/home.html',
+		'!**/includes/**/*.html',
+	])
+		.pipe(plugins.tap((file) => {
+			const srcPath = path.relative('src', path.relative(file.cwd, file.path));
+			const urlPath = ((file) => {
+				let rel = file
+				if (/^pages\//.test(rel)) {
+					rel = path.relative('pages', rel);
+				}
+				return rel.replace(/(?<dir>[^\/]+)\/\k<dir>/, '$<dir>');
+			})(srcPath);
+			gulp.src('./src/index.html')
+				.pipe(plugins.replaceString({
+					pattern: /<!--#include\s+file="pages\/home.html"\s*-->/,
+					replacement: (match) => {
+						if (srcPath === 'index.html') {
+							return match;
+						}
+						return `<!--#include file="${srcPath}" -->`;
+					},
+				}))
+				.pipe(plugins.ssi(options.ssi || {}))
+				.pipe(plugins.rename({
+					dirname: path.dirname(urlPath),
+					basename: path.basename(urlPath, '.html'),
+					extname: '.html',
+					prefix: '',
+				}))
+				.pipe(plugins.minimizeHtml(options.minimizeHtml || {}))
+				.pipe(gulp.dest(options.dest));
+		}));
+}
+
+// TODO: Collect essays by directory and build the list of links in the directory's index.html
+// TODO: And also for archive/index.html
+// TODO: And build and minimize JSON-LD on each page
+// TODO: And build RSS feed
+function compileCollectionPages() {
+	return gulp.src([
+		'**/index.html',
+		'!./src/index.html',
+		'!**/includes/**/*.html',
+	]).pipe(plugins.ssi(options.ssi || {}))
+	.pipe(plugins.minimizeHtml(options.minimizeHtml || {}));
+}
+
+gulp.task('compile:html', gulp.parallel(compilePages, compileCollectionPages));
 
 function lintSass() {
 	return gulp.src([
