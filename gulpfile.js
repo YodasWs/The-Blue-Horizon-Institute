@@ -568,14 +568,27 @@ gulp.task('watch', (done) => {
 	}, gulp.series(lintJs, 'compile:js', 'reload'));
 	gulp.watch('./src/**/*.html', {
 		usePolling: true,
-	}, gulp.series('compile:html', 'reload'));
+	}, gulp.series('compile:html', 'compile:dev', 'reload'));
 	done();
 });
 
-gulp.task('serve', (done) => {
-	plugins.connect.server(options.connect);
-	done();
+// Set <base> to local server for development
+gulp.task('compile:dev', () => {
+	return gulp.src('./docs/**/*.html')
+		.pipe(plugins.replaceString({
+			pattern: /<base href="[^\"]*"\s*\/?>/,
+			replacement: `<base href="http://localhost:${argv.port}/">`,
+		}))
+		.pipe(gulp.dest(options.dest));
 });
+
+gulp.task('serve', gulp.series(
+	'compile:dev',
+	(done) => {
+		plugins.connect.server(options.connect);
+		done();
+	},
+));
 
 gulp.task('generate:page', gulp.series(
 	(done) => {
@@ -801,9 +814,9 @@ body > nav:not([hidden]) {\n\tdisplay: flex;\n\tflex-flow: row wrap;\n\tjustify-
 				done();
 				return;
 			}
-			const str = `<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="stylesheet" href="min.css" />
+			const str = `<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="min.css">
 <script src="res/yodasws.js"></script>
 <script src="app.js"></script>\n`
 			return plugins.newFile(`head-includes.html`, str, { src: true })
