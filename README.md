@@ -15,4 +15,4 @@ To bridge the gap between abstract logical modeling and practical public policy.
 ## 🛠️ The Platform
 This repository hosts the Institute's official research portal.
 - __Built with Logic:__ Powered by a custom-built static site generator (SSG) authored in Node.js using Gulp.
-- __Open Research:__ All policy papers are version-controlled to ensure transparency and and maintain intellectual history.
+- __Open Research:__ All policy papers are version-controlled to ensure transparency and maintain intellectual history.
