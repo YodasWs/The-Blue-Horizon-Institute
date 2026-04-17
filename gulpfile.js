@@ -465,6 +465,9 @@ function compileCollectionPages(done) {
 		...articles,
 		archive: archiveArticles,
 	}).forEach(([dir, as]) => {
+		if (!fs.existsSync(path.join(strDirPages.dest, dir))) {
+			fs.mkdirSync(path.join(strDirPages.dest, dir), { recursive: true, });
+		}
 		const html = fs.readFileSync(path.join(strDirPages.src, dir, 'index.html'), 'utf8');
 		const $ = cheerio.load(html);
 		const jsonLd = {
@@ -533,27 +536,32 @@ function applyPageTemplate() {
 				}
 				return rel.replace(/(?<dir>[^\/]+)\/\k<dir>/, '$<dir>');
 			})(srcPath);
-				gulp.src('./src/index.html')
-					.pipe(plugins.replaceString({
-						pattern: /<!--#include\s+file="pages\/home.html"\s*-->/,
-						replacement: (match) => {
-							if (srcPath === 'index.html') {
-								return match;
-							}
-							return `<!--#include file="${srcPath}" -->`;
-						},
-					}))
-					.pipe(plugins.ssi(options.ssi || {}))
-					.pipe(plugins.rename({
-						dirname: path.dirname(urlPath),
-						basename: path.basename(urlPath, '.html'),
-						extname: '.html',
-						prefix: '',
-					}))
-					.pipe(plugins.minimizeHtml(options.minimizeHtml || {}))
-					.pipe(gulp.dest(options.build));
-			}));
+			gulp.src('./src/index.html')
+				.pipe(plugins.replaceString({
+					pattern: /<!--#include\s+file="pages\/home.html"\s*-->/,
+					replacement: (match) => {
+						if (srcPath === 'index.html') {
+							return match;
+						}
+						return `<!--#include file="${srcPath}" -->`;
+					},
+				}))
+				.pipe(plugins.ssi(options.ssi || {}))
+				.pipe(plugins.rename({
+					dirname: path.dirname(urlPath),
+					basename: path.basename(urlPath, '.html'),
+					extname: '.html',
+					prefix: '',
+				}))
+				.pipe(plugins.minimizeHtml(options.minimizeHtml || {}))
+				.pipe(gulp.dest(options.build));
+		}));
 }
+
+gulp.task('compile:article', gulp.series(
+	applyPageTemplate,
+	compilePages,
+));
 
 gulp.task('compile:index', gulp.series(
 	applyPageTemplate,
