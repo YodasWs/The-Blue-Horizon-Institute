@@ -117,7 +117,7 @@ details > summary {
 
 @supports (background: light-dark(#F1F1F2, #1A1A1A)) {
 	html {
-		background: light-dark(whitesmoke, map.get($dark-theme, 'html'));
+		background: light-dark(map.get($light-theme, 'html'), map.get($dark-theme, 'html'));
 	}
 
 	body {
