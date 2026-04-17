@@ -84,6 +84,7 @@ import gulp from 'gulp';
 import path from 'path';
 import fileExists from 'file-exists';
 
+import * as cheerio from 'cheerio';
 import * as sass from 'sass';
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
@@ -111,7 +112,6 @@ plugins.replaceString = require('@yodasws/gulp-pattern-replace');
 plugins.webpack = require('webpack-stream');
 plugins.named = require('vinyl-named');
 plugins['connect.reload'] = plugins.connect.reload;
-
 
 import siteJson from './src/app.json' with { type: 'json' };
 
@@ -164,6 +164,7 @@ const options = {
 		overrideBrowserslist: browsers,
 	},
 	dest: 'docs/',
+	build: 'build/',
 	rmLines: {
 		css: {
 			filters: [
@@ -406,11 +407,120 @@ function runTasks(task) {
 });
 
 // Wrap the home page, essays, and miscellaneous pages in the site template and move to the docs folder
-function compilePages() {
+function compilePages(done) {
+	return gulp.src([
+		'./build/**/*.html',
+		'!./build/*/index.html',
+		'!./build/*/**/index.html',
+		'!./build/pages/home.html',
+	])
+		.pipe(gulp.dest(options.dest));
+}
+
+function getArticles(dir) {
+	return fs.readdirSync(dir)
+		.filter(f => f.endsWith('.html') && f !== 'index.html')
+		.map((filename) => {
+			const html = fs.readFileSync(path.join(dir, filename), 'utf8');
+			const $ = cheerio.load(html);
+			const obj = {
+				filename,
+			};
+			$('article').attr('itemscope', true).attr('itemtype', 'https://schema.org/AnalysisNewsArticle');
+			obj.title = $('h2').first().attr('itemprop', 'headline').text();
+			$('time').first().attr('itemprop', 'datePublished');
+
+			obj.pubDate = new Date($('time').attr('datetime'));
+
+			return obj;
+		});
+}
+
+// Collect essays by directory and build the list of links in the directory's index.html
+// And in JSON+LD
+// And also for archive/index.html
+// TODO: Build RSS feed
+function compileCollectionPages(done) {
+	const strDirPages = {
+		src: 'build',
+		dest: 'docs',
+	};
+	// First, get list of directories that have index.html (not including `archive`, which is a special case)
+	const directories = fs.readdirSync(strDirPages.src, { withFileTypes: true })
+		.filter(dirent => dirent.isDirectory())
+		.map(dirent => dirent.name)
+		.filter(dirent => dirent !== 'archive' && fs.existsSync(path.join(strDirPages.src, dirent, 'index.html')));
+
+	const articles = {};
+	let archiveArticles = [];
+
+	// Gather list of articles in each directory
+	directories.forEach((dir) => {
+		// Sort articles by publication date, newest first
+		articles[dir] = getArticles(path.join(strDirPages.src, dir)).sort((a, b) => b.pubDate - a.pubDate);
+		archiveArticles = archiveArticles.concat(articles[dir]).sort((a, b) => b.pubDate - a.pubDate);
+	});
+
+	Object.entries({
+		...articles,
+		archive: archiveArticles,
+	}).forEach(([dir, as]) => {
+		const html = fs.readFileSync(path.join(strDirPages.src, dir, 'index.html'), 'utf8');
+		const $ = cheerio.load(html);
+		const jsonLd = {
+			'@context': 'https://schema.org',
+			'@type': 'CollectionPage',
+			name: $('h2').first().text(),
+			mainEntity: {
+				'@type': 'ItemList',
+				numberOfItems: as.length,
+				itemListElement: [],
+			},
+		};
+
+		// Clear out old lists, if any
+		$('ol').remove();
+		$('script[type="application/ld+json"]').remove();
+
+		// Build lists of links to articles in this directory and add to page
+		const $ol = $('<ol reversed>');
+
+		as.forEach((a, position) => {
+			$ol.append(`<li><a href="${dir}/${a.filename}">${a.title}</a> — ${a.pubDate.getDate()} ${a.pubDate.toLocaleString('en-us', { month: 'short' })} ${a.pubDate.getFullYear()}</li>`);
+			jsonLd.mainEntity.itemListElement.push({
+				'@type': 'ListItem',
+				position,
+				item: {
+					'@type': 'AnalysisNewsArticle',
+					url: `https://yodasws.github.io/The-Blue-Horizon-Institute/${dir}/${a.filename}`,
+					headline: a.title,
+					datePublished: [
+						String(a.pubDate.getFullYear()),
+						String(a.pubDate.getMonth()).padStart(2, '0'),
+						String(a.pubDate.getDate()).padStart(2, '0'),
+					].join('-'),
+					author: {
+						'@type': 'Person',
+						name: 'Sam Grundman',
+					},
+				},
+			});
+		});
+
+		// Append to HTML
+		$('main').append($ol.prop('outerHTML'));
+		$('head').append(`<script type="application/ld+json">${JSON.stringify(jsonLd)}`);
+
+		// Save to index.html
+		fs.writeFileSync(path.join(strDirPages.dest, dir, 'index.html'), $.html());
+	});
+
+	done();
+}
+
+function applyPageTemplate() {
 	return gulp.src([
 		'./src/**/*.html',
-		'!./src/*/index.html',
-		'!./src/*/**/index.html',
 		'!./src/pages/home.html',
 		'!**/includes/**/*.html',
 	])
@@ -423,42 +533,52 @@ function compilePages() {
 				}
 				return rel.replace(/(?<dir>[^\/]+)\/\k<dir>/, '$<dir>');
 			})(srcPath);
-			gulp.src('./src/index.html')
-				.pipe(plugins.replaceString({
-					pattern: /<!--#include\s+file="pages\/home.html"\s*-->/,
-					replacement: (match) => {
-						if (srcPath === 'index.html') {
-							return match;
-						}
-						return `<!--#include file="${srcPath}" -->`;
-					},
-				}))
-				.pipe(plugins.ssi(options.ssi || {}))
-				.pipe(plugins.rename({
-					dirname: path.dirname(urlPath),
-					basename: path.basename(urlPath, '.html'),
-					extname: '.html',
-					prefix: '',
-				}))
-				.pipe(plugins.minimizeHtml(options.minimizeHtml || {}))
-				.pipe(gulp.dest(options.dest));
-		}));
+				gulp.src('./src/index.html')
+					.pipe(plugins.replaceString({
+						pattern: /<!--#include\s+file="pages\/home.html"\s*-->/,
+						replacement: (match) => {
+							if (srcPath === 'index.html') {
+								return match;
+							}
+							return `<!--#include file="${srcPath}" -->`;
+						},
+					}))
+					.pipe(plugins.ssi(options.ssi || {}))
+					.pipe(plugins.rename({
+						dirname: path.dirname(urlPath),
+						basename: path.basename(urlPath, '.html'),
+						extname: '.html',
+						prefix: '',
+					}))
+					.pipe(plugins.minimizeHtml(options.minimizeHtml || {}))
+					.pipe(gulp.dest(options.build));
+			}));
 }
 
-// TODO: Collect essays by directory and build the list of links in the directory's index.html
-// TODO: And also for archive/index.html
-// TODO: And build and minimize JSON-LD on each page
-// TODO: And build RSS feed
-function compileCollectionPages() {
-	return gulp.src([
-		'**/index.html',
-		'!./src/index.html',
-		'!**/includes/**/*.html',
-	]).pipe(plugins.ssi(options.ssi || {}))
-	.pipe(plugins.minimizeHtml(options.minimizeHtml || {}));
-}
+gulp.task('compile:index', gulp.series(
+	applyPageTemplate,
+	compileCollectionPages,
+));
 
-gulp.task('compile:html', gulp.parallel(compilePages, compileCollectionPages));
+gulp.task('compile:html', gulp.series(
+	applyPageTemplate,
+	gulp.parallel(compilePages, compileCollectionPages),
+	function setMainAttributes() {
+		return gulp.src('./docs/**/*.html')
+			.pipe(plugins.tap((file) => {
+				const srcPath = path.relative('docs', path.relative(file.cwd, file.path))
+				const dir = path.dirname(srcPath);
+				if (dir === '.') return;
+				const componentName = 'page' + dir.slice(0, 1).toUpperCase() + dir.slice(1);
+				gulp.src(path.join('docs', srcPath))
+					.pipe(plugins.replaceString({
+						pattern: /<main aria-live="polite">/,
+						replacement: `<main y-page="${componentName}">`,
+					}))
+					.pipe(gulp.dest(options.dest));
+			}))
+	},
+));
 
 function lintSass() {
 	return gulp.src([
