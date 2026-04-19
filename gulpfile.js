@@ -527,7 +527,7 @@ function applyPageTemplate() {
 		'!./src/pages/home.html',
 		'!**/includes/**/*.html',
 	])
-		.pipe(plugins.tap((file) => {
+		.pipe(plugins.flatmap((stream, file) => {
 			const srcPath = path.relative('src', path.relative(file.cwd, file.path));
 			const urlPath = ((file) => {
 				let rel = file
@@ -536,7 +536,7 @@ function applyPageTemplate() {
 				}
 				return rel.replace(/(?<dir>[^\/]+)\/\k<dir>/, '$<dir>');
 			})(srcPath);
-			gulp.src('./src/index.html')
+			return gulp.src('./src/index.html')
 				.pipe(plugins.replaceString({
 					pattern: /<!--#include\s+file="pages\/home.html"\s*-->/,
 					replacement: (match) => {
@@ -569,22 +569,27 @@ gulp.task('compile:index', gulp.series(
 ));
 
 gulp.task('compile:html', gulp.series(
+	(done) => {
+		fs.rmSync('./build/', { recursive: true, force: true });
+		fs.mkdirSync('./build/');
+		done();
+	},
 	applyPageTemplate,
 	gulp.parallel(compilePages, compileCollectionPages),
 	function setMainAttributes() {
 		return gulp.src('./docs/**/*.html')
-			.pipe(plugins.tap((file) => {
+			.pipe(plugins.flatmap((stream, file) => {
 				const srcPath = path.relative('docs', path.relative(file.cwd, file.path))
 				const dir = path.dirname(srcPath);
-				if (dir === '.') return;
+				if (dir === '.') return stream;
 				const componentName = 'page' + dir.slice(0, 1).toUpperCase() + dir.slice(1);
-				gulp.src(path.join('docs', srcPath))
+				return gulp.src(path.join('docs', srcPath))
 					.pipe(plugins.replaceString({
 						pattern: /<main aria-live="polite">/,
 						replacement: `<main y-page="${componentName}">`,
 					}))
 					.pipe(gulp.dest(options.dest));
-			}))
+			}));
 	},
 ));
 
