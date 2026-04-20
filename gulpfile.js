@@ -417,6 +417,20 @@ function compilePages(done) {
 		.pipe(gulp.dest(options.dest));
 }
 
+const SamGrundman = {
+	'@context': 'https://schema.org',
+	'@type': 'Person',
+	'@id': 'https://yodasws.github.io/The-Blue-Horizon-Institute/about/',
+	name: 'Sam Grundman',
+	sameAs: [
+		'https://www.facebook.com/SamGrundmanForCLT/',
+		'https://ballotpedia.org/Sam_Grundman',
+		'https://github.com/YodasWs/',
+		'https://gist.github.com/YodasWs/',
+		'https://www.linkedin.com/in/sam-grundman',
+	],
+};
+
 function getArticles(dir) {
 	return fs.readdirSync(dir)
 		.filter(f => f.endsWith('.html') && f !== 'index.html')
@@ -426,11 +440,29 @@ function getArticles(dir) {
 			const obj = {
 				filename,
 			};
-			$('article').attr('itemscope', true).attr('itemtype', 'https://schema.org/AnalysisNewsArticle');
 			obj.title = $('h2').first().attr('itemprop', 'headline').text();
-			$('time').first().attr('itemprop', 'datePublished');
 
-			obj.pubDate = new Date($('time').attr('datetime'));
+			obj.ldJson = {
+				...JSON.parse($('script[type="application/ld+json"]').text() || '{}'),
+				'@context': 'https://schema.org',
+				headline: obj.title,
+				author: SamGrundman,
+			};
+
+			if ($('article[itemtype^="https://schema.org/"]').length > 0) {
+				obj.ldJson['@type'] = $('article[itemtype^="https://schema.org/"]').attr('itemtype').split('/').pop();
+			} else if (!obj.ldJson['@type']) {
+				obj.ldJson['@type'] = 'AnalysisNewsArticle';
+			}
+
+			if ($('time[datetime]').length > 0) {
+				obj.pubDate = new Date($('time').attr('datetime'));
+				obj.ldJson.datePublished = [
+					String(obj.pubDate.getFullYear()),
+					String(obj.pubDate.getMonth()).padStart(2, '0'),
+					String(obj.pubDate.getDate()).padStart(2, '0'),
+				].join('-');
+			}
 
 			return obj;
 		});
@@ -451,32 +483,33 @@ function compileCollectionPages(done) {
 		.map(dirent => dirent.name)
 		.filter(dirent => dirent !== 'archive' && fs.existsSync(path.join(strDirPages.src, dirent, 'index.html')));
 
-	const articles = {};
+	const objArticles = {};
 	let archiveArticles = [];
 
 	// Gather list of articles in each directory
 	directories.forEach((dir) => {
 		// Sort articles by publication date, newest first
-		articles[dir] = getArticles(path.join(strDirPages.src, dir)).sort((a, b) => b.pubDate - a.pubDate);
-		archiveArticles = archiveArticles.concat(articles[dir]).sort((a, b) => b.pubDate - a.pubDate);
+		objArticles[dir] = getArticles(path.join(strDirPages.src, dir)).sort((a, b) => b.pubDate - a.pubDate);
+		archiveArticles = archiveArticles.concat(objArticles[dir]).sort((a, b) => b.pubDate - a.pubDate);
 	});
 
 	Object.entries({
-		...articles,
+		...objArticles,
 		archive: archiveArticles,
-	}).forEach(([dir, as]) => {
+	}).forEach(([dir, htmlArticles]) => {
 		if (!fs.existsSync(path.join(strDirPages.dest, dir))) {
 			fs.mkdirSync(path.join(strDirPages.dest, dir), { recursive: true, });
 		}
 		const html = fs.readFileSync(path.join(strDirPages.src, dir, 'index.html'), 'utf8');
 		const $ = cheerio.load(html);
 		const jsonLd = {
+			...JSON.parse($('script[type="application/ld+json"]').text() || '{}'),
 			'@context': 'https://schema.org',
 			'@type': 'CollectionPage',
 			name: $('h2').first().text(),
 			mainEntity: {
 				'@type': 'ItemList',
-				numberOfItems: as.length,
+				numberOfItems: htmlArticles.length,
 				itemListElement: [],
 			},
 		};
@@ -488,24 +521,15 @@ function compileCollectionPages(done) {
 		// Build lists of links to articles in this directory and add to page
 		const $ol = $('<ol reversed>');
 
-		as.forEach((a, position) => {
-			$ol.append(`<li><a href="${dir}/${a.filename}">${a.title}</a> — ${a.pubDate.getDate()} ${a.pubDate.toLocaleString('en-us', { month: 'short' })} ${a.pubDate.getFullYear()}</li>`);
+		htmlArticles.forEach((objArticle, position) => {
+			$ol.append(`<li><a href="${dir}/${objArticle.filename}">${objArticle.title}</a> — ${objArticle.pubDate.getDate()} ${objArticle.pubDate.toLocaleString('en-us', { month: 'short' })} ${objArticle.pubDate.getFullYear()}</li>`);
 			jsonLd.mainEntity.itemListElement.push({
 				'@type': 'ListItem',
 				position,
 				item: {
 					'@type': 'AnalysisNewsArticle',
-					url: `https://yodasws.github.io/The-Blue-Horizon-Institute/${dir}/${a.filename}`,
-					headline: a.title,
-					datePublished: [
-						String(a.pubDate.getFullYear()),
-						String(a.pubDate.getMonth()).padStart(2, '0'),
-						String(a.pubDate.getDate()).padStart(2, '0'),
-					].join('-'),
-					author: {
-						'@type': 'Person',
-						name: 'Sam Grundman',
-					},
+					...objArticle.ldJson,
+					url: `https://yodasws.github.io/The-Blue-Horizon-Institute/${dir}/${objArticle.filename}`,
 				},
 			});
 		});
@@ -558,6 +582,9 @@ function applyPageTemplate() {
 		}));
 }
 
+gulp.task('compile:template', applyPageTemplate);
+gulp.task('compile:pages', compilePages);
+
 gulp.task('compile:article', gulp.series(
 	applyPageTemplate,
 	compilePages,
@@ -576,6 +603,7 @@ gulp.task('compile:html', gulp.series(
 	},
 	applyPageTemplate,
 	gulp.parallel(compilePages, compileCollectionPages),
+	// TODO: Make this stop posting the articles in `docs/` instead of `docs/threats/` and `docs/economy/`
 	function setMainAttributes() {
 		return gulp.src('./docs/**/*.html')
 			.pipe(plugins.flatmap((stream, file) => {
